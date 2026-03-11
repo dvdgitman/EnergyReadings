@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingestion-api
+  labels:
+    app: ingestion-api
+    {{- include "energy-pipeline.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.ingestionApi.replicaCount }}
+  selector:
+    matchLabels:
+      app: ingestion-api
+  template:
+    metadata:
+      labels:
+        app: ingestion-api
+        {{- include "energy-pipeline.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: ingestion-api
+          image: "{{ .Values.ingestionApi.image.repository }}:{{ .Values.ingestionApi.image.tag }}"
+          imagePullPolicy: {{ .Values.ingestionApi.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.ingestionApi.port }}
+          env:
+            - name: REDIS_HOST
+              value: redis
+            - name: REDIS_PORT
+              value: "{{ .Values.redis.port }}"
+          resources:
+            {{- toYaml .Values.ingestionApi.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.ingestionApi.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.ingestionApi.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingestion-api
+  labels:
+    app: ingestion-api
+    {{- include "energy-pipeline.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: ingestion-api
+  ports:
+    - port: 80
+      targetPort: {{ .Values.ingestionApi.port }}
+  type: ClusterIP
+
