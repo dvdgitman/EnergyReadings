@@ -1,0 +1,22 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: processing-svc-scaledobject
+  labels:
+    {{- include "energy-pipeline.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: processing-svc
+  minReplicaCount: {{ .Values.processingSvc.keda.minReplicas }}
+  maxReplicaCount: {{ .Values.processingSvc.keda.maxReplicas }}
+  pollingInterval: 15    # how often KEDA checks the scaler (seconds)
+  cooldownPeriod: 60     # how long to wait before scaling down after load drops
+  triggers:
+    - type: redis-streams
+      metadata:
+        address: redis:{{ .Values.redis.port }}
+        stream: energy_readings
+        consumerGroup: processing_group
+        # Scale up when pending (unacknowledged) messages per replica exceeds this
+        pendingEntriesCount: "{{ .Values.processingSvc.keda.pendingEntriesThreshold }}"
+
