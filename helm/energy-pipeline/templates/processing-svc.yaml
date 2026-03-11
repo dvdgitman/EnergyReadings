@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: processing-svc
+  labels:
+    app: processing-svc
+    {{- include "energy-pipeline.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.processingSvc.replicaCount }}
+  selector:
+    matchLabels:
+      app: processing-svc
+  template:
+    metadata:
+      labels:
+        app: processing-svc
+        {{- include "energy-pipeline.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: processing-svc
+          image: "{{ .Values.processingSvc.image.repository }}:{{ .Values.processingSvc.image.tag }}"
+          imagePullPolicy: {{ .Values.processingSvc.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.processingSvc.port }}
+          env:
+            - name: REDIS_HOST
+              value: redis
+            - name: REDIS_PORT
+              value: "{{ .Values.redis.port }}"
+            - name: CONSUMER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name   # use pod name for unique consumer IDs
+          resources:
+            {{- toYaml .Values.processingSvc.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.processingSvc.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.processingSvc.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: processing-svc
+  labels:
+    app: processing-svc
+    {{- include "energy-pipeline.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: processing-svc
+  ports:
+    - port: 80
+      targetPort: {{ .Values.processingSvc.port }}
+  type: ClusterIP
+
+
